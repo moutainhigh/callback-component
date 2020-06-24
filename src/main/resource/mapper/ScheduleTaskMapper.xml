@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.jinghui.callback.dao.ScheduleTaskMapper">
+    <resultMap id="BaseResultMap" type="com.jinghui.callback.entity.ScheduleTaskDO">
+        <id column="id" property="id"/>
+        <result column="schedule_name" property="scheduleName" jdbcType="INTEGER"/>
+        <result column="bean_name" property="beanName" jdbcType="VARCHAR"/>
+        <result column="task_parameter" property="taskParameter" jdbcType="VARCHAR"/>
+        <result column="next_execTime" property="nextExecTime" jdbcType="TIMESTAMP"/>
+        <result column="exec_plan" property="execPlan" jdbcType="VARCHAR"/>
+        <result column="last_exec_time" property="lastExecTime" jdbcType="TIMESTAMP"/>
+        <result column="locker" property="locker" jdbcType="VARCHAR"/>
+        <result column="status" property="status" jdbcType="INTEGER"/>
+        <result column="error_msg" property="errorMsg" jdbcType="VARCHAR"/>
+        <result column="gmt_create" property="gmtCreate" jdbcType="VARCHAR"/>
+        <result column="gmt_modified" property="gmtModified" jdbcType="VARCHAR"/>
+    </resultMap>
+
+    <select id="findFirstByStatusAndLocker" resultMap="BaseResultMap">
+        SELECT *
+        FROM schedule_task
+        WHERE `status` = #{status} and locker = #{locker}
+    </select>
+
+    <update id="lockTask" flushCache="true">
+        UPDATE schedule_task t
+        SET t.status = 2, t.locker = #{locker}
+        WHERE t.status = 1 AND t.next_exec_time &lt; CURRENT_TIME()
+    </update>
+
+    <select id="findByScheduleName" resultMap="BaseResultMap">
+        SELECT *
+        FROM schedule_task
+        WHERE schedule_name = #{scheduleName}
+    </select>
+
+    <update id="deleteByScheduleNameLike" flushCache="true">
+        DELETE FROM ScheduleTask t
+        WHERE t.schedule_name like CONCAT(#{scheduleName}, '%')
+    </update>
+
+    <update id="unlockTasks" flushCache="true">
+        UPDATE schedule_task t
+        SET t.status = 1
+        WHERE t.status = 2 AND t.gmt_create &lt; #{nowAfterFiveSeconds}
+    </update>
+
+    <update id="modifyLastExecTime" flushCache="true">
+        UPDATE schedule_task t
+        SET t.last_exec_time = CURRENT_TIME()
+        WHERE t.id = #{id}
+    </update>
+
+    <select id="findByStatusAndLocker" resultMap="BaseResultMap">
+        SELECT *
+        FROM schedule_task
+        WHERE `status` = #{statusExecuting} and locker = #{locker}
+    </select>
+
+</mapper>
