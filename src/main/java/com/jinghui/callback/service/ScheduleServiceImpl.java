@@ -191,7 +191,7 @@ public class ScheduleServiceImpl implements ScheduleService {
                 try {
                     int affectedRows = scheduleTaskMapper.lockTask(locker);
                     if (affectedRows <= 0) {
-                        TimeUnit.SECONDS.sleep(10);
+                        TimeUnit.SECONDS.sleep(100);
                         continue;
                     }
 
