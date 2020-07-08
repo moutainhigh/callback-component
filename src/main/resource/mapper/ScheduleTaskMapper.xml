@@ -25,7 +25,7 @@
     <update id="lockTask" flushCache="true">
         UPDATE schedule_task t
         SET t.status = 2, t.locker = #{locker}
-        WHERE t.status = 1 AND t.next_exec_time &lt; CURRENT_TIME()
+        WHERE t.status = 1 AND t.next_exec_time &lt; #{now} limit 20
     </update>
 
     <select id="findByScheduleName" resultMap="BaseResultMap">

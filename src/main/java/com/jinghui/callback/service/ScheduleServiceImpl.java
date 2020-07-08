@@ -1,6 +1,5 @@
 package com.jinghui.callback.service;
 
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.jinghui.callback.dao.ScheduleTaskMapper;
 import com.jinghui.callback.entity.ScheduleTaskDO;
 import com.jinghui.callback.utils.HostUtils;
@@ -9,7 +8,7 @@ import org.quartz.CronExpression;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
@@ -19,11 +18,8 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -37,18 +33,20 @@ public class ScheduleServiceImpl implements ScheduleService {
 
     private static final Logger logger = LoggerFactory.getLogger(ScheduleServiceImpl.class);
 
-    @Value("${scheduler.thread.num:20}")
-    private int threadNum = 20;
+    private final Map<String, Task> taskMap;
+
+    private final ThreadPoolTaskExecutor threadPoolTaskExecutor;
+
+    private ScheduleTaskMapper scheduleTaskMapper;
+
+    private volatile boolean destroyed = false;
 
     @Autowired(required = false)
-    private Map<String, Task> taskMap = new HashMap<>();
-
-    private ExecutorService executorService;
-
-    private boolean destroyed = false;
-
-    @Autowired
-    private ScheduleTaskMapper scheduleTaskMapper;
+    public ScheduleServiceImpl(Map<String, Task> taskMap, ThreadPoolTaskExecutor threadPoolTaskExecutor, ScheduleTaskMapper scheduleTaskMapper) {
+        this.taskMap = taskMap;
+        this.threadPoolTaskExecutor = threadPoolTaskExecutor;
+        this.scheduleTaskMapper = scheduleTaskMapper;
+    }
 
     @Override
     public long addSchedule(String scheduleName, String beanName, String taskParameter, String schedulePlan) {
@@ -116,8 +114,6 @@ public class ScheduleServiceImpl implements ScheduleService {
     @PostConstruct
     public void init() {
         startUnlockTaskThread();
-        executorService = Executors.newFixedThreadPool(threadNum,
-                new ThreadFactoryBuilder().setNameFormat("pool-schedule-%d").build());
         new Thread(new ScheduleThreadTask(), "schedule-scanner").start();
     }
 
@@ -143,7 +139,6 @@ public class ScheduleServiceImpl implements ScheduleService {
         unlockTaskThread.setDaemon(true);
         unlockTaskThread.start();
     }
-
 
     @PreDestroy
     public void destroy() {
@@ -189,7 +184,7 @@ public class ScheduleServiceImpl implements ScheduleService {
             String locker = HostUtils.getServerIp() + "-" + HostUtils.getPid() + "_" + Thread.currentThread().getId();
             while (!destroyed) {
                 try {
-                    int affectedRows = scheduleTaskMapper.lockTask(locker);
+                    int affectedRows = scheduleTaskMapper.lockTask(locker, LocalDateTime.now());
                     if (affectedRows <= 0) {
                         TimeUnit.SECONDS.sleep(100);
                         continue;
@@ -209,7 +204,7 @@ public class ScheduleServiceImpl implements ScheduleService {
                         scheduleTaskDO.setLastExecTime(LocalDateTime.now());
                         scheduleTaskMapper.updateById(scheduleTaskDO);
                         logger.info("提交执行任务到线程池,scheduleId: {}", scheduleTaskDO.getTaskParameter());
-                        executorService.submit(() -> executeTask(scheduleTaskDO));
+                        threadPoolTaskExecutor.submit(() -> executeTask(scheduleTaskDO));
                     }
                 } catch (Exception e) {
                     logger.error(e.getMessage(), e);
