@@ -9,7 +9,6 @@ import java.lang.management.ManagementFactory;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
-import java.net.UnknownHostException;
 import java.util.Enumeration;
 import java.util.List;
 
@@ -55,32 +54,8 @@ public class HostUtils {
         return getServerIpList().get(0);
     }
 
-    public static String getHostName() {
-        if (System.getenv("COMPUTERNAME") != null) {
-            return System.getenv("COMPUTERNAME");
-        } else {
-            return getHostNameForLinux();
-        }
-    }
-
     public static String getPid() {
         String name = ManagementFactory.getRuntimeMXBean().getName();
         return StringUtils.substringBefore(name, "@");
-    }
-
-    private static String getHostNameForLinux() {
-        try {
-            return (InetAddress.getLocalHost()).getHostName();
-        } catch (UnknownHostException uhe) {
-            // host = "hostname: hostname"
-            String host = uhe.getMessage();
-            if (host != null) {
-                int colon = host.indexOf(':');
-                if (colon > 0) {
-                    return host.substring(0, colon);
-                }
-            }
-            return "UnknownHost";
-        }
     }
 }
